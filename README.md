@@ -19,8 +19,8 @@ Current API route:
 - command: npm start
 - localhost:8000
 - JSON output style:
-	- "items": { "pens": 0, "standardSD": 0, "microSD": 0 }, "trays": [ { "length": 3, "width": 3, "height": "short" }, { "length": 3, "width": 3, "height": "high" } ], "availableSpace": [ [0, 0], [0, 1], [1, 0], [1, 1] ] }
-
+	- { "items": { "pens": 0, "standardSD": 0, "microSD": 0 }, "trays": [ { "length": 3, "width": 3, "height": "short" }, { "length": 3, "width": 3, "height": "high" } ], "availableSpace": [ [0, 0], [0, 1], [1, 0], [1, 1] ] }
+  
 ## Quick start
 
 ### 1) Create and activate a virtual environment
