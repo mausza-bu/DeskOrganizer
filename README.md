@@ -2,6 +2,10 @@
 
 DeskOrganizer is a FastAPI service that uses an AI API to convert user natural-language input into structured JSON, then uses that structure to generate desk-organizer object definitions.
 
+## UI notes:
+- localhost:8000
+- JSON output style: 
+  - "items": { "pens": 0, "standardSD": 0, "microSD": 0 }, "trays": [ { "length": 3, "width": 3, "height": "short" }, { "length": 3, "width": 3, "height": "high" } ], "availableSpace": [ [0, 0], [0, 1], [1, 0], [1, 1] ] }
 ## What this project does
 
 - Accepts user text input (for example: preferred desk organizer size/features).

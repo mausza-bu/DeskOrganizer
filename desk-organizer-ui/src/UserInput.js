@@ -169,13 +169,13 @@ const UserInput = () => {
       });
 
       if (response.ok) {
-        alert('success, data sent to backend');
+        alert('success sent to backend');
       } else {
-        alert('alert: backend alert');
+        alert('alert: backend error');
       }
     } catch (error) {
       console.error(error);
-      alert('alert: console alert');
+      alert('alert: could not connect to the backend');
     }
 
     return payload;
