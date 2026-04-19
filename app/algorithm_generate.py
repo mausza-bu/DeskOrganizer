@@ -12,7 +12,7 @@ GRID_SIZE = 50
 def mock_space():
     space = [[0]*GRID_SIZE for _ in range(GRID_SIZE)]
 
-    # 一个测试区域
+    # A test region
     for i in range(20, 35):
         for j in range(20, 35):
             space[i][j] = 1
@@ -22,7 +22,7 @@ def mock_space():
 
 def mock_modules():
     """
-    module 已经是展开后的，每个有 type
+    Modules are already expanded, and each has a type.
     """
     return [
         {"id": 1, "type": "pen", "w": 2, "h": 2},
