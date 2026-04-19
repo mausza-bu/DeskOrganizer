@@ -1,9 +1,10 @@
+import math
 import cadquery as cq
 
 # Geometry defaults
 CELL_SIZE = 20.0        # Base unit footprint per pen (X and Y)
 HOLDER_HEIGHT = 70.0    # Total height
-SLOT_DIAMETER = 12.0    # Pen slot diameter
+SLOT_DIAMETER = 15.0    # Pen slot diameter (per spec)
 FLOOR_THICKNESS = 5.0   # Material left under slots so pens don't touch desk
 
 
@@ -18,14 +19,13 @@ def make_pen_holder(
 ) -> cq.Workplane:
     """Build a rectangular pen holder with circular slots.
 
-    E.g. num_pens=10, num_rows=2 -> 100x40x70mm block with 5x2 slots.
+    num_pens does not need to divide evenly into num_rows; extra cells are
+    left solid (no hole) in row-major order.
     """
-    if num_pens % num_rows != 0:
-        raise ValueError(
-            f"num_pens ({num_pens}) must be divisible by num_rows ({num_rows})"
-        )
+    if num_pens < 1 or num_rows < 1:
+        raise ValueError("num_pens and num_rows must be >= 1")
 
-    cols = num_pens // num_rows
+    cols = math.ceil(num_pens / num_rows)
     outer_x = cols * cell_size
     outer_y = num_rows * cell_size
     slot_depth = holder_height - floor_thickness
@@ -34,11 +34,12 @@ def make_pen_holder(
         outer_x, outer_y, holder_height, centered=(False, False, False)
     )
 
-    slot_points = [
-        (col * cell_size + cell_size / 2, row * cell_size + cell_size / 2)
-        for row in range(num_rows)
-        for col in range(cols)
-    ]
+    slot_points = []
+    for i in range(num_pens):
+        row, col = i // cols, i % cols
+        slot_points.append(
+            (col * cell_size + cell_size / 2, row * cell_size + cell_size / 2)
+        )
 
     result = (
         result.faces(">Z").workplane()
