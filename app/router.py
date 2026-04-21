@@ -1,102 +1,73 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
-import json
+import io
 import os
-from dotenv import load_dotenv
+import tempfile
+import zipfile
 
-load_dotenv()
+import cadquery as cq
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
+from pydantic import BaseModel
 
-# ====== Router ======
+from app.pipeline import run_pipeline
+
 router = APIRouter()
 
-# ====== Request Schema ======
-class TextRequest(BaseModel):
-    text: str
+
+class Items(BaseModel):
+    pens: int = 0
+    standardSD: int = 0
+    microSD: int = 0
 
 
-# ====== CONFIG ======
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+class Tray(BaseModel):
+    length: int
+    width: int
+    height: str  # "short" or "high"
 
 
-# ====== PROMPT ======
-def build_prompt(user_text: str) -> str:
-    return f"""
-You are a system that converts natural language into JSON.
-
-User input:
-{user_text}
-
-Return ONLY JSON. No explanation.
-
-Example format (placeholder, can change later):
-{{
-  "object": "placeholder",
-  "params": {{
-    "size": "unknown",
-    "features": []
-  }}
-}}
-"""
+class GenerateOrganizerRequest(BaseModel):
+    items: Items
+    trays: list[Tray]
+    availableSpace: list[list[int]]
 
 
-# ====== AI CALL ======
-def call_ai(prompt: str) -> str:
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
+@router.post("/api/generate-organizer")
+def generate_organizer(req: GenerateOrganizerRequest):
+    if not req.availableSpace:
+        raise HTTPException(400, "No available space selected on the grid.")
+    if req.items.pens + req.items.standardSD + req.items.microSD == 0 and not req.trays:
+        raise HTTPException(400, "No items requested (pens, SD cards, or trays).")
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You output JSON only."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
+    result = run_pipeline(req.items, req.trays, req.availableSpace)
+
+    if not result["modules"]:
+        raise HTTPException(
+            400,
+            f"Nothing could be placed. {len(result['unplaced_ids'])} module(s) "
+            f"did not fit in the selected space.",
         )
 
-        return response.choices[0].message.content
+    zip_buf = io.BytesIO()
+    with tempfile.TemporaryDirectory() as tmp:
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for m in result["modules"]:
+                fname = f"{m['type']}_{m['id']}.stl"
+                fpath = os.path.join(tmp, fname)
+                cq.exporters.export(m["cad"], fpath)
+                zf.write(fpath, fname)
 
-    except Exception as e:
-        print("AI call failed, fallback to mock:", e)
+            if result["combined"] is not None:
+                combined_path = os.path.join(tmp, "combined.stl")
+                cq.exporters.export(result["combined"], combined_path)
+                zf.write(combined_path, "combined.stl")
 
-        # ===== fallback JSON =====
-        return json.dumps({
-            "object": "mock_object",
-            "params": {
-                "size": "40x40x20",
-                "features": ["slot1", "slot2"]
-            }
-        })
-
-
-# ====== PARSE JSON ======
-def safe_parse_json(text: str):
-    try:
-        text = text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-
-        return json.loads(text)
-
-    except Exception as e:
-        print("JSON parse error:", e)
-        return {
-            "error": "invalid_json",
-            "raw_output": text
-        }
-
-
-# ====== ROUTE ======
-@router.post("/parse")
-def parse_text(req: TextRequest):
-    prompt = build_prompt(req.text)
-
-    ai_output = call_ai(prompt)
-
-    parsed_json = safe_parse_json(ai_output)
-
-    return {
-        "input": req.text,
-        "ai_raw": ai_output,
-        "parsed": parsed_json
-    }
+    zip_buf.seek(0)
+    return Response(
+        content=zip_buf.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="organizer.zip"',
+            "X-Placements": str(len(result["placements"])),
+            "X-Unplaced": ",".join(str(i) for i in result["unplaced_ids"]),
+        },
+    )

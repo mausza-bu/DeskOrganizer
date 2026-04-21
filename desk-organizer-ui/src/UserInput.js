@@ -195,9 +195,30 @@ const UserInput = () => {
       });
 
       if (response.ok) {
-        alert('success sent to backend');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'organizer.zip';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        const placed = response.headers.get('X-Placements') || '?';
+        const unplaced = response.headers.get('X-Unplaced') || '';
+        alert(
+          unplaced
+            ? `downloaded organizer.zip (${placed} placed; modules ${unplaced} did not fit)`
+            : `downloaded organizer.zip (${placed} modules placed)`
+        );
       } else {
-        alert('alert: backend error');
+        let msg = 'backend error';
+        try {
+          const body = await response.json();
+          if (body && body.detail) msg = body.detail;
+        } catch (_) {}
+        alert(`error: ${msg}`);
       }
     } catch (error) {
       console.error(error);
